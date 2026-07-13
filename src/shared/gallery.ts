@@ -1,5 +1,7 @@
 export type GalleryVisibility = "private" | "shared";
 
+export type GalleryMediaKind = "photo" | "video";
+
 export type NebulaUserRole = "user" | "admin";
 
 export interface NebulaUser {
@@ -29,12 +31,27 @@ export interface GalleryMediaRecord {
   updatedAt: string;
 }
 
-export interface GalleryMediaView extends GalleryMediaRecord {
+export interface GalleryMediaView {
+  id: string;
+  ownerUserId: string;
+  ownerDisplayName: string;
+  kind: GalleryMediaKind;
+  visibility: GalleryVisibility;
+  filename: string;
+  mimeType: string;
+  size: number;
+  width?: number | null;
+  height?: number | null;
+  durationSeconds?: number | null;
+  capturedAt: string | null;
+  year: number | null;
+  month: number | null;
   contentUrl: string;
-  thumbnailUrl: string;
-  canShare: boolean;
-  canMakePrivate: boolean;
-  canDelete: boolean;
+  thumbnailUrl?: string;
+  createdAt: string;
+  updatedAt: string;
+  canShare?: boolean;
+  canDelete?: boolean;
 }
 
 export interface GalleryTimelineMonth {

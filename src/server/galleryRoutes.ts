@@ -5,7 +5,7 @@ import path from "node:path";
 import express from "express";
 import multer from "multer";
 import type { GalleryMediaRecord, GalleryMediaView, GalleryVisibility } from "../shared/gallery";
-import { isSupportedMediaType } from "../shared/gallery";
+import { isSupportedMediaType, isVideoMimeType } from "../shared/gallery";
 import { requireAuthenticatedUser } from "./auth";
 import { canDeleteMedia, canMakeMediaPrivate, canShareMedia, canUploadToVisibility } from "./galleryAccess";
 import {
@@ -29,22 +29,33 @@ const upload = multer({
   }
 });
 
-function mediaView(media: GalleryMediaRecord, userId: string): GalleryMediaView {
+function mediaView(media: GalleryMediaRecord): GalleryMediaView {
   return {
-    ...media,
+    id: media.id,
+    ownerUserId: media.ownerUserId,
+    ownerDisplayName: media.addedByName,
+    kind: isVideoMimeType(media.mimeType) ? "video" : "photo",
+    visibility: media.visibility,
+    filename: media.filename,
+    mimeType: media.mimeType,
+    size: media.fileSize,
+    width: media.width,
+    height: media.height,
+    durationSeconds: media.duration,
+    capturedAt: media.capturedAt,
+    year: media.year,
+    month: media.month,
     contentUrl: `/api/gallery/media/${media.id}/content`,
     thumbnailUrl: `/api/gallery/media/${media.id}/content?variant=thumbnail`,
-    canShare: canShareMedia({ id: userId, name: userId, role: "admin" }, media),
-    canMakePrivate: false,
-    canDelete: false
+    createdAt: media.createdAt,
+    updatedAt: media.updatedAt
   };
 }
 
 function viewForUser(media: GalleryMediaRecord, user: ReturnType<typeof requireAuthenticatedUser>): GalleryMediaView {
   return {
-    ...mediaView(media, user.id),
+    ...mediaView(media),
     canShare: canShareMedia(user, media),
-    canMakePrivate: canMakeMediaPrivate(user, media),
     canDelete: canDeleteMedia(user, media)
   };
 }
@@ -110,7 +121,8 @@ galleryRouter.get("/media", async (req, res, next) => {
 galleryRouter.get("/timeline", async (req, res, next) => {
   try {
     const user = requireAuthenticatedUser(req);
-    res.json(await getGalleryTimeline(user, parseScope(req.query.scope)));
+    const timeline = await getGalleryTimeline(user, parseScope(req.query.scope));
+    res.json({ timeline: timeline.years });
   } catch (error) {
     next(error);
   }
@@ -166,7 +178,7 @@ galleryRouter.get("/media/:id/content", async (req, res, next) => {
   }
 });
 
-galleryRouter.post("/upload", upload.array("media"), async (req, res, next) => {
+galleryRouter.post("/upload", upload.any(), async (req, res, next) => {
   try {
     const user = requireAuthenticatedUser(req);
     const visibility: GalleryVisibility = req.body.visibility === "shared" ? "shared" : "private";
@@ -176,7 +188,7 @@ galleryRouter.post("/upload", upload.array("media"), async (req, res, next) => {
       return;
     }
 
-    const files = Array.isArray(req.files) ? req.files : [];
+    const files = (Array.isArray(req.files) ? req.files : []).filter((file) => file.fieldname === "file" || file.fieldname === "media");
     const created: GalleryMediaRecord[] = [];
 
     for (const file of files) {
@@ -217,7 +229,7 @@ galleryRouter.post("/upload", upload.array("media"), async (req, res, next) => {
       created.push(await addGalleryMedia(record));
     }
 
-    res.status(201).json({ media: created.map((item) => viewForUser(item, user)) });
+    res.status(201).json({ media: created.length === 1 ? viewForUser(created[0], user) : created.map((item) => viewForUser(item, user)) });
   } catch (error) {
     next(error);
   }

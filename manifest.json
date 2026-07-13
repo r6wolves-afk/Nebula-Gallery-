@@ -1,0 +1,13 @@
+{
+  "id": "gallery",
+  "name": "Nebula Gallery",
+  "version": "0.1.0",
+  "type": "ui",
+  "summary": "Private and shared media gallery for Nebula.",
+  "description": "Browse, upload, preview, and organize images and videos using Nebula's core Gallery APIs.",
+  "icon": "image",
+  "color": "#9b5cff",
+  "route": "/apps/gallery",
+  "entry": "frontend/index.html",
+  "permissions": ["files.read", "files.write"]
+}

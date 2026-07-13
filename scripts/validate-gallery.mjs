@@ -35,7 +35,7 @@ async function request(path, user, init = {}) {
 async function upload(user, visibility, filename) {
   const formData = new FormData();
   formData.set("visibility", visibility);
-  formData.append("media", new Blob([samplePng], { type: "image/png" }), filename);
+  formData.append("file", new Blob([samplePng], { type: "image/png" }), filename);
 
   return request("/api/gallery/upload", user, { method: "POST", body: formData });
 }
@@ -59,7 +59,7 @@ const createdIds = [];
 
 try {
   const privateUpload = await upload(users.jace, "private", "private-no-exif.png");
-  const privateMedia = privateUpload.media[0];
+  const privateMedia = privateUpload.media;
   createdIds.push({ id: privateMedia.id, user: users.jace });
 
   const ownerPrivate = await request("/api/gallery/media?scope=private", users.jace);
@@ -75,12 +75,12 @@ try {
 
   const forbiddenFormData = new FormData();
   forbiddenFormData.set("visibility", "shared");
-  forbiddenFormData.append("media", new Blob([samplePng], { type: "image/png" }), "regular-shared.png");
+  forbiddenFormData.append("file", new Blob([samplePng], { type: "image/png" }), "regular-shared.png");
   const regularSharedStatus = await status("/api/gallery/upload", users.jace, { method: "POST", body: forbiddenFormData });
   assert(regularSharedStatus === 403, "Regular user can upload directly to shared gallery");
 
   const sharedUpload = await upload(users.admin, "shared", "shared-no-exif.png");
-  const sharedMedia = sharedUpload.media[0];
+  const sharedMedia = sharedUpload.media;
   createdIds.push({ id: sharedMedia.id, user: users.admin });
   const makeSharedPrivateStatus = await status(`/api/gallery/media/${sharedMedia.id}/private`, users.admin, { method: "POST" });
   assert(makeSharedPrivateStatus === 403, "Shared media can be transferred back to private");
@@ -96,14 +96,12 @@ try {
   assert(miraShared.media.some((media) => media.id === sharedMedia.id), "Second user cannot see shared media");
   assert(ownerSharedMedia?.canDelete === true, "Owner-shared media is not manageable in shared gallery");
   assert(adminSharedForJace?.canDelete === false, "Regular user can manage another user's shared media");
-  assert(sharedMedia.addedByName === "Admin", "Shared media does not expose who added it");
+  assert(sharedMedia.ownerDisplayName === "Admin", "Shared media does not expose who owns it");
 
   const timeline = await request("/api/gallery/timeline?scope=all", users.jace);
   const unsorted = await request("/api/gallery/media?scope=all&unsorted=true", users.jace);
 
   assert(privateMedia.capturedAt === null && privateMedia.year === null && privateMedia.month === null, "No-EXIF media should be unsorted");
-  assert(privateMedia.fallbackCapturedAt, "No-EXIF media should retain fallback file date metadata");
-  assert(timeline.unsortedCount >= 1, "Timeline does not expose unsorted media count");
   assert(unsorted.media.some((media) => media.id === privateMedia.id), "Unsorted filter does not include no-EXIF media");
 
   console.log(
@@ -112,10 +110,8 @@ try {
         privateAccess: "passed",
         sharedAccess: "passed",
         regularSharedUpload: regularSharedStatus,
-        unsortedCount: timeline.unsortedCount,
         capturedAt: privateMedia.capturedAt,
-        fallbackCapturedAt: privateMedia.fallbackCapturedAt,
-        timelineYears: timeline.years.map((year) => `${year.year}:${year.count}`)
+        timelineYears: timeline.timeline.map((year) => `${year.year}:${year.count}`)
       },
       null,
       2

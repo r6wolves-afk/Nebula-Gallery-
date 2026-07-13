@@ -2,31 +2,19 @@ import { ChangeEvent, useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
-  Cloud,
   Film,
   Grid3X3,
   ImageIcon,
-  LayoutDashboard,
-  Library,
   Lock,
-  Package,
   Search,
   Share2,
-  Shield,
   Square,
-  Settings,
   Trash2,
   Upload,
   X
 } from "lucide-react";
-import type { GalleryMediaView, GalleryTimeline, GalleryVisibility, NebulaUser } from "../shared/gallery";
+import type { GalleryMediaView, GalleryTimelineYear, GalleryVisibility } from "../shared/gallery";
 import { isVideoMimeType } from "../shared/gallery";
-
-const demoUsers: NebulaUser[] = [
-  { id: "jace", name: "Jace", role: "user" },
-  { id: "mira", name: "Mira", role: "user" },
-  { id: "admin", name: "Admin", role: "admin" }
-];
 
 const monthNames = [
   "January",
@@ -45,19 +33,11 @@ const monthNames = [
 
 type MediaKindFilter = "all" | "photos" | "videos";
 
-function authHeaders(user: NebulaUser): HeadersInit {
-  return {
-    "X-Nebula-User-Id": user.id,
-    "X-Nebula-User-Name": user.name,
-    "X-Nebula-User-Role": user.role
-  };
-}
-
-async function galleryFetch<T>(url: string, user: NebulaUser, init: RequestInit = {}): Promise<T> {
+async function galleryFetch<T>(url: string, init: RequestInit = {}): Promise<T> {
   const response = await fetch(url, {
     ...init,
+    credentials: "same-origin",
     headers: {
-      ...authHeaders(user),
       ...init.headers
     }
   });
@@ -74,11 +54,11 @@ async function galleryFetch<T>(url: string, user: NebulaUser, init: RequestInit 
   return response.json() as Promise<T>;
 }
 
-function useMediaObjectUrl(media: GalleryMediaView | null, user: NebulaUser): string | null {
+function useMediaObjectUrl(media: GalleryMediaView | null): string | null {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!media) {
+    if (!media || isVideoMimeType(media.mimeType)) {
       setUrl(null);
       return;
     }
@@ -86,7 +66,7 @@ function useMediaObjectUrl(media: GalleryMediaView | null, user: NebulaUser): st
     let cancelled = false;
     let objectUrl: string | null = null;
 
-    fetch(media.contentUrl, { headers: authHeaders(user) })
+    fetch(media.contentUrl, { credentials: "same-origin" })
       .then((response) => {
         if (!response.ok) {
           throw new Error("Unable to load media");
@@ -114,7 +94,7 @@ function useMediaObjectUrl(media: GalleryMediaView | null, user: NebulaUser): st
         URL.revokeObjectURL(objectUrl);
       }
     };
-  }, [media, user]);
+  }, [media]);
 
   return url;
 }
@@ -123,26 +103,36 @@ function mediaKindLabel(mimeType: string): "Picture" | "Video" {
   return isVideoMimeType(mimeType) ? "Video" : "Picture";
 }
 
+function canShareMedia(media: GalleryMediaView): boolean {
+  return media.canShare ?? media.visibility === "private";
+}
+
+function canDeleteMedia(media: GalleryMediaView): boolean {
+  return media.canDelete ?? true;
+}
+
+function canSelectMedia(media: GalleryMediaView): boolean {
+  return canDeleteMedia(media) || canShareMedia(media);
+}
+
 function MediaThumb({
   media,
-  user,
   isSelected,
   selectionMode,
   onOpen,
   onToggleSelect
 }: {
   media: GalleryMediaView;
-  user: NebulaUser;
   isSelected: boolean;
   selectionMode: boolean;
   onOpen: () => void;
   onToggleSelect: () => void;
 }) {
-  const objectUrl = useMediaObjectUrl(media, user);
+  const objectUrl = useMediaObjectUrl(media);
   const isVideo = isVideoMimeType(media.mimeType);
   const mediaKind = mediaKindLabel(media.mimeType);
   const timelineLabel = media.year && media.month ? `${monthNames[media.month - 1]} ${media.year}` : "Unsorted";
-  const canSelect = media.canDelete || media.canShare;
+  const canSelect = canSelectMedia(media);
 
   function handleTileClick() {
     if (selectionMode && canSelect) {
@@ -168,8 +158,8 @@ function MediaThumb({
       <button className="media-open" onClick={handleTileClick} type="button">
         <div className="media-frame">
           {objectUrl && !isVideo ? <img src={objectUrl} alt={media.filename} /> : null}
-          {objectUrl && isVideo ? <video src={objectUrl} muted playsInline /> : null}
-          {!objectUrl ? (
+          {isVideo ? <video src={media.contentUrl} muted playsInline preload="metadata" /> : null}
+          {!objectUrl && !isVideo ? (
             <div className="media-placeholder">{isVideo ? <Film size={34} /> : <ImageIcon size={34} />}</div>
           ) : null}
         </div>
@@ -185,17 +175,14 @@ function MediaThumb({
 function MetadataPanel({ media }: { media: GalleryMediaView }) {
   const capturedLabel = media.capturedAt ? new Date(media.capturedAt).toLocaleString() : "Unsorted";
   const rows = [
-    ["Owner", media.ownerUserId],
-    ["Added by", media.addedByName],
+    ["Owner", media.ownerDisplayName || media.ownerUserId],
     ["Visibility", media.visibility],
     ["Media type", mediaKindLabel(media.mimeType)],
     ["Captured", capturedLabel],
-    ["File date", new Date(media.fallbackCapturedAt).toLocaleString()],
     ["Type", media.mimeType],
-    ["Size", `${(media.fileSize / 1024 / 1024).toFixed(2)} MB`],
+    ["Size", `${(media.size / 1024 / 1024).toFixed(2)} MB`],
     ["Dimensions", media.width && media.height ? `${media.width} x ${media.height}` : "Unknown"],
-    ["Duration", media.duration ? `${media.duration.toFixed(1)}s` : "Not available"],
-    ["Source", media.sourceFilePath]
+    ["Duration", media.durationSeconds ? `${media.durationSeconds.toFixed(1)}s` : "Not available"]
   ];
 
   return (
@@ -211,8 +198,8 @@ function MetadataPanel({ media }: { media: GalleryMediaView }) {
   );
 }
 
-function Lightbox({ media, user, onClose }: { media: GalleryMediaView; user: NebulaUser; onClose: () => void }) {
-  const objectUrl = useMediaObjectUrl(media, user);
+function Lightbox({ media, onClose }: { media: GalleryMediaView; onClose: () => void }) {
+  const objectUrl = useMediaObjectUrl(media);
   const isVideo = isVideoMimeType(media.mimeType);
 
   return (
@@ -221,9 +208,9 @@ function Lightbox({ media, user, onClose }: { media: GalleryMediaView; user: Neb
         <X size={20} />
       </button>
       <div className="preview-stage">
-        {objectUrl && isVideo ? <video src={objectUrl} controls autoPlay /> : null}
+        {isVideo ? <video src={media.contentUrl} controls autoPlay preload="metadata" /> : null}
         {objectUrl && !isVideo ? <img src={objectUrl} alt={media.filename} /> : null}
-        {!objectUrl ? <div className="preview-empty">Loading preview</div> : null}
+        {!objectUrl && !isVideo ? <div className="preview-empty">Loading preview</div> : null}
       </div>
       <MetadataPanel media={media} />
     </div>
@@ -231,9 +218,8 @@ function Lightbox({ media, user, onClose }: { media: GalleryMediaView; user: Neb
 }
 
 export function App() {
-  const [user, setUser] = useState<NebulaUser>(demoUsers[0]);
   const [scope, setScope] = useState<GalleryVisibility>("private");
-  const [timeline, setTimeline] = useState<GalleryTimeline | null>(null);
+  const [timeline, setTimeline] = useState<GalleryTimelineYear[]>([]);
   const [media, setMedia] = useState<GalleryMediaView[]>([]);
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
@@ -259,12 +245,12 @@ export function App() {
     }
 
     const [mediaResult, timelineResult] = await Promise.all([
-      galleryFetch<{ media: GalleryMediaView[] }>(`/api/gallery/media?${params}`, user),
-      galleryFetch<GalleryTimeline>(`/api/gallery/timeline?scope=${nextScope}`, user)
+      galleryFetch<{ media: GalleryMediaView[] }>(`/api/gallery/media?${params}`),
+      galleryFetch<{ timeline: GalleryTimelineYear[] }>(`/api/gallery/timeline?scope=${nextScope}`)
     ]);
 
     setMedia(mediaResult.media);
-    setTimeline(timelineResult);
+    setTimeline(timelineResult.timeline);
     setSelectedMediaIds((current) => new Set(mediaResult.media.filter((item) => current.has(item.id)).map((item) => item.id)));
   }
 
@@ -272,7 +258,7 @@ export function App() {
     refreshGallery().catch((requestError: unknown) => {
       setError(requestError instanceof Error ? requestError.message : "Unable to load gallery");
     });
-  }, [user, scope, selectedYear, selectedMonth, selectedUnsorted]);
+  }, [scope, selectedYear, selectedMonth, selectedUnsorted]);
 
   function chooseScope(nextScope: GalleryVisibility) {
     setScope(nextScope);
@@ -310,7 +296,7 @@ export function App() {
 
   function selectAllDeletable() {
     setSelectionMode(true);
-    setSelectedMediaIds(new Set(filteredMedia.filter((item) => item.canDelete || item.canShare).map((item) => item.id)));
+    setSelectedMediaIds(new Set(filteredMedia.filter(canSelectMedia).map((item) => item.id)));
   }
 
   function chooseMediaKindFilter(nextFilter: MediaKindFilter) {
@@ -320,7 +306,7 @@ export function App() {
   }
 
   async function shareSelectedMedia() {
-    const selected = media.filter((item) => selectedMediaIds.has(item.id) && item.canShare);
+    const selected = media.filter((item) => selectedMediaIds.has(item.id) && canShareMedia(item));
 
     if (!selected.length) {
       return;
@@ -329,7 +315,7 @@ export function App() {
     setError(null);
 
     try {
-      await Promise.all(selected.map((item) => galleryFetch(`/api/gallery/media/${item.id}/share`, user, { method: "POST" })));
+      await Promise.all(selected.map((item) => galleryFetch(`/api/gallery/media/${item.id}/share`, { method: "POST" })));
       setSelectedMediaIds(new Set());
       setSelectionMode(false);
       await refreshGallery();
@@ -339,7 +325,7 @@ export function App() {
   }
 
   async function deleteSelectedMedia() {
-    const selected = media.filter((item) => selectedMediaIds.has(item.id) && item.canDelete);
+    const selected = media.filter((item) => selectedMediaIds.has(item.id) && canDeleteMedia(item));
 
     if (!selected.length) {
       return;
@@ -348,7 +334,7 @@ export function App() {
     setError(null);
 
     try {
-      await Promise.all(selected.map((item) => galleryFetch(`/api/gallery/media/${item.id}`, user, { method: "DELETE" })));
+      await Promise.all(selected.map((item) => galleryFetch(`/api/gallery/media/${item.id}`, { method: "DELETE" })));
       setSelectedMediaIds(new Set());
       setSelectionMode(false);
       await refreshGallery();
@@ -368,13 +354,15 @@ export function App() {
     setError(null);
 
     try {
-      const formData = new FormData();
-      Array.from(files).forEach((file) => formData.append("media", file));
-      formData.set("visibility", scope);
-      await galleryFetch<{ media: GalleryMediaView[] }>("/api/gallery/upload", user, {
-        method: "POST",
-        body: formData
-      });
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.set("file", file);
+        formData.set("visibility", scope);
+        await galleryFetch<{ media: GalleryMediaView }>("/api/gallery/upload", {
+          method: "POST",
+          body: formData
+        });
+      }
       await refreshGallery();
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed");
@@ -384,11 +372,11 @@ export function App() {
     }
   }
 
-  async function mutateMedia(mediaId: string, action: "share" | "private" | "delete") {
+  async function mutateMedia(mediaId: string, action: "share" | "delete") {
     const method = action === "delete" ? "DELETE" : "POST";
     const path = action === "delete" ? `/api/gallery/media/${mediaId}` : `/api/gallery/media/${mediaId}/${action}`;
 
-    await galleryFetch(path, user, { method });
+    await galleryFetch(path, { method });
     setActiveMedia(null);
     setSelectedMediaIds((current) => {
       const next = new Set(current);
@@ -398,8 +386,7 @@ export function App() {
     await refreshGallery();
   }
 
-  const selectableCount = media.filter((item) => item.canDelete || item.canShare).length;
-  const shareableSelectedCount = media.filter((item) => selectedMediaIds.has(item.id) && item.canShare).length;
+  const shareableSelectedCount = media.filter((item) => selectedMediaIds.has(item.id) && canShareMedia(item)).length;
   const hasShareableSelection = shareableSelectedCount > 0;
   const selectedCount = selectedMediaIds.size;
   const filteredMedia = media.filter((item) => {
@@ -413,14 +400,14 @@ export function App() {
 
     return true;
   });
-  const filteredSelectableCount = filteredMedia.filter((item) => item.canDelete || item.canShare).length;
+  const filteredSelectableCount = filteredMedia.filter(canSelectMedia).length;
   const mediaCountLabel = `${filteredMedia.length} ${mediaKindFilter === "photos" ? "photo" : mediaKindFilter === "videos" ? "video" : "item"}${filteredMedia.length === 1 ? "" : "s"}`;
 
   return (
     <div className="shell addon-shell">
       <aside className="sidebar addon-sidebar">
         <div className="addon-brand">
-          <p className="eyebrow">NEBULA ADD-ON</p>
+          <p className="eyebrow">GALLERY</p>
           <h1>Nebula Gallery</h1>
         </div>
 
@@ -463,9 +450,9 @@ export function App() {
             onClick={() => { setSelectedYear(null); setSelectedMonth(null); setSelectedUnsorted(true); }}
             type="button"
           >
-            <ImageIcon size={18} /> <span>Unsorted</span><small>{timeline?.unsortedCount ?? 0}</small>
+            <ImageIcon size={18} /> <span>Unsorted</span>
           </button>
-          {timeline?.years.map((year) => (
+          {timeline.map((year) => (
             <div className="timeline-year" key={year.year}>
               <button
                 className={selectedYear === year.year && !selectedMonth && !selectedUnsorted ? "active" : ""}
@@ -487,105 +474,12 @@ export function App() {
             </div>
           ))}
         </div>
-
-        <label className="user-switcher addon-user">
-          Signed in
-          <select
-            value={user.id}
-            onChange={(event) => setUser(demoUsers.find((candidate) => candidate.id === event.target.value) ?? demoUsers[0])}
-          >
-            {demoUsers.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>{candidate.name} ({candidate.role})</option>
-            ))}
-          </select>
-        </label>
       </aside>
 
       <main className="workspace addon-workspace">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">NEBULA PORTAL</p>
-            <h1>Nebula Gallery</h1>
-          </div>
-          <label className="search-box">
-            <Search size={17} />
-            <input placeholder="Search media and settings" type="search" />
-          </label>
-          <label className="user-switcher">
-            Signed in
-            <select
-              value={user.id}
-              onChange={(event) => setUser(demoUsers.find((candidate) => candidate.id === event.target.value) ?? demoUsers[0])}
-            >
-              {demoUsers.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>{candidate.name} ({candidate.role})</option>
-              ))}
-            </select>
-          </label>
-        </header>
-
-        <section className="gallery-toolbar">
-          <div className="segmented" aria-label="Gallery scope">
-            <button className={scope === "private" ? "selected" : ""} onClick={() => chooseScope("private")} type="button">
-              <Lock size={16} /> Private
-            </button>
-            <button className={scope === "shared" ? "selected" : ""} onClick={() => chooseScope("shared")} type="button">
-              <Share2 size={16} /> Shared
-            </button>
-          </div>
-          <label className="upload-button">
-            <Upload size={17} /> {isUploading ? "Importing" : "Upload"}
-            <input
-              accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
-              multiple
-              onChange={handleUpload}
-              type="file"
-            />
-          </label>
-        </section>
-
         {error ? <div className="error-banner">{error}</div> : null}
 
-        <div className="gallery-layout">
-          <aside className="timeline-browser">
-            <button
-              className={!selectedYear && !selectedUnsorted ? "timeline-all active" : "timeline-all"}
-              onClick={() => { setSelectedYear(null); setSelectedMonth(null); setSelectedUnsorted(false); }}
-              type="button"
-            >
-              <CalendarDays size={18} /> All media
-            </button>
-            <button
-              className={selectedUnsorted ? "timeline-all active" : "timeline-all"}
-              onClick={() => { setSelectedYear(null); setSelectedMonth(null); setSelectedUnsorted(true); }}
-              type="button"
-            >
-              <ImageIcon size={18} /> <span>Unsorted</span><small>{timeline?.unsortedCount ?? 0}</small>
-            </button>
-            {timeline?.years.map((year) => (
-              <div className="timeline-year" key={year.year}>
-                <button
-                  className={selectedYear === year.year && !selectedMonth && !selectedUnsorted ? "active" : ""}
-                  onClick={() => { setSelectedYear(year.year); setSelectedMonth(null); setSelectedUnsorted(false); }}
-                  type="button"
-                >
-                  <span>{year.year}</span><small>{year.count}</small>
-                </button>
-                {year.months.map((month) => (
-                  <button
-                    className={selectedYear === year.year && selectedMonth === month.month && !selectedUnsorted ? "month active" : "month"}
-                    key={month.month}
-                    onClick={() => { setSelectedYear(year.year); setSelectedMonth(month.month); setSelectedUnsorted(false); }}
-                    type="button"
-                  >
-                    <span>{monthNames[month.month - 1]}</span><small>{month.count}</small>
-                  </button>
-                ))}
-              </div>
-            ))}
-          </aside>
-
-          <section className="media-section">
+        <section className="media-section">
             <div className="section-heading">
               <div>
                 <h2>{scope === "private" ? "Private Gallery" : "Shared Gallery"}</h2>
@@ -603,7 +497,15 @@ export function App() {
                 </button>
               </div>
               <div className="gallery-actions">
-                {user.role === "admin" ? <span className="admin-chip"><Shield size={14} /> Admin controls enabled</span> : null}
+                <label className="upload-button compact-gallery-upload">
+                  <Upload size={16} /> {isUploading ? "Importing" : "Upload"}
+                  <input
+                    accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/quicktime"
+                    multiple
+                    onChange={handleUpload}
+                    type="file"
+                  />
+                </label>
                 {media.length ? (
                   <button className="secondary-action" onClick={toggleSelectionMode} type="button">
                     {selectionMode ? "Cancel select" : "Select"}
@@ -636,7 +538,6 @@ export function App() {
                   <MediaThumb
                     key={item.id}
                     media={item}
-                    user={user}
                     isSelected={selectedMediaIds.has(item.id)}
                     selectionMode={selectionMode}
                     onOpen={() => setActiveMedia(item)}
@@ -651,23 +552,19 @@ export function App() {
                 <p>{media.length ? `No ${mediaKindFilter} match this view.` : "Import images or videos to start building this timeline."}</p>
               </div>
             )}
-          </section>
-        </div>
+        </section>
       </main>
 
       {activeMedia ? (
-        <Lightbox media={activeMedia} user={user} onClose={() => setActiveMedia(null)} />
+        <Lightbox media={activeMedia} onClose={() => setActiveMedia(null)} />
       ) : null}
 
       {activeMedia ? (
         <div className="action-dock">
-          {activeMedia.canShare ? (
+          {canShareMedia(activeMedia) ? (
             <button onClick={() => mutateMedia(activeMedia.id, "share")} type="button"><Share2 size={16} /> Move to shared</button>
           ) : null}
-          {activeMedia.canMakePrivate ? (
-            <button onClick={() => mutateMedia(activeMedia.id, "private")} type="button"><Lock size={16} /> Make private</button>
-          ) : null}
-          {activeMedia.canDelete ? (
+          {canDeleteMedia(activeMedia) ? (
             <button className="danger" onClick={() => mutateMedia(activeMedia.id, "delete")} type="button"><Trash2 size={16} /> Delete</button>
           ) : null}
         </div>

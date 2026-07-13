@@ -5,15 +5,15 @@ import { galleryRouter } from "./galleryRoutes";
 
 const app = express();
 const port = Number(process.env.PORT ?? 4174);
-const distDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "dist");
+const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend");
 
 app.use(express.json());
 app.use("/api/gallery", galleryRouter);
 
 if (process.env.NODE_ENV === "production") {
-  app.use(express.static(distDir));
+  app.use(express.static(frontendDir));
   app.get(/.*/, (_req, res) => {
-    res.sendFile(path.join(distDir, "index.html"));
+    res.sendFile(path.join(frontendDir, "index.html"));
   });
 }
 
