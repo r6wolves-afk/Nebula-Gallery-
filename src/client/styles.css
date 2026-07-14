@@ -925,14 +925,20 @@ select {
 
 .sidebar-scope {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 12px 0 20px;
   width: 100%;
 }
 
 .sidebar-scope button {
   justify-content: center;
-  padding: 7px 8px;
+  min-width: 0;
+  padding: 7px 6px;
+}
+
+.sidebar-scope button:last-child {
+  grid-column: 1 / -1;
 }
 
 .sidebar-section-label {
