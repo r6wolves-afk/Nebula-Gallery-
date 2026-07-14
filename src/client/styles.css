@@ -925,7 +925,7 @@ select {
 
 .sidebar-scope {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   margin: 12px 0 20px;
   width: 100%;
 }

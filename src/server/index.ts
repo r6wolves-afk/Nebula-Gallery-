@@ -1,21 +1,13 @@
 import express from "express";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { galleryRouter } from "./galleryRoutes";
+
+// Standalone dev/mock API server only. Nebula core owns the production Gallery backend.
 
 const app = express();
 const port = Number(process.env.PORT ?? 4174);
-const frontendDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "frontend");
 
 app.use(express.json());
 app.use("/api/gallery", galleryRouter);
-
-if (process.env.NODE_ENV === "production") {
-  app.use(express.static(frontendDir));
-  app.get(/.*/, (_req, res) => {
-    res.sendFile(path.join(frontendDir, "index.html"));
-  });
-}
 
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   if (error instanceof Error && error.name === "UnauthenticatedError") {
@@ -28,5 +20,5 @@ app.use((error: unknown, _req: express.Request, res: express.Response, _next: ex
 });
 
 app.listen(port, () => {
-  console.log(`Nebula core server listening on http://127.0.0.1:${port}`);
+  console.log(`Nebula Gallery mock API server listening on http://127.0.0.1:${port}`);
 });

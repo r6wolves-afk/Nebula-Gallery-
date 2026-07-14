@@ -1,11 +1,11 @@
 {
-  "name": "nebula-gallery-core",
+  "name": "nebula-gallery",
   "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
-    "server": "tsx src/server/index.ts",
+    "mock:server": "tsx src/server/index.ts",
     "validate:gallery": "node scripts/validate-gallery.mjs",
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && vite build"

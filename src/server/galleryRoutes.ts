@@ -21,6 +21,8 @@ import {
 } from "./galleryStore";
 import { capturedParts, extractMediaMetadata, persistUpload } from "./metadata";
 
+// Standalone development/mock implementation of Nebula core's Gallery API contract.
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -30,33 +32,28 @@ const upload = multer({
 });
 
 function mediaView(media: GalleryMediaRecord): GalleryMediaView {
+  const capturedAt = media.capturedAt ?? media.fallbackCapturedAt ?? media.createdAt;
+  const { year, month } = capturedParts(capturedAt);
+
   return {
     id: media.id,
     ownerUserId: media.ownerUserId,
     ownerDisplayName: media.addedByName,
-    kind: isVideoMimeType(media.mimeType) ? "video" : "photo",
+    kind: isVideoMimeType(media.mimeType) ? "video" : "image",
     visibility: media.visibility,
     filename: media.filename,
     mimeType: media.mimeType,
     size: media.fileSize,
+    capturedAt,
+    year,
+    month,
+    contentUrl: `/api/gallery/media/${media.id}/content`,
     width: media.width,
     height: media.height,
     durationSeconds: media.duration,
-    capturedAt: media.capturedAt,
-    year: media.year,
-    month: media.month,
-    contentUrl: `/api/gallery/media/${media.id}/content`,
     thumbnailUrl: `/api/gallery/media/${media.id}/content?variant=thumbnail`,
     createdAt: media.createdAt,
     updatedAt: media.updatedAt
-  };
-}
-
-function viewForUser(media: GalleryMediaRecord, user: ReturnType<typeof requireAuthenticatedUser>): GalleryMediaView {
-  return {
-    ...mediaView(media),
-    canShare: canShareMedia(user, media),
-    canDelete: canDeleteMedia(user, media)
   };
 }
 
@@ -112,7 +109,7 @@ galleryRouter.get("/media", async (req, res, next) => {
       unsorted: req.query.unsorted === "true"
     });
 
-    res.json({ media: media.map((item) => viewForUser(item, user)) });
+    res.json({ media: media.map(mediaView) });
   } catch (error) {
     next(error);
   }
@@ -138,7 +135,7 @@ galleryRouter.get("/media/:id", async (req, res, next) => {
       return;
     }
 
-    res.json({ media: viewForUser(media, user) });
+    res.json({ media: mediaView(media) });
   } catch (error) {
     next(error);
   }
@@ -203,7 +200,7 @@ galleryRouter.post("/upload", upload.any(), async (req, res, next) => {
       await persistUpload(absolutePath, file.buffer);
 
       const metadata = await extractMediaMetadata(absolutePath, file.mimetype);
-      const { year, month } = capturedParts(metadata.capturedAt);
+      const { year, month } = capturedParts(metadata.capturedAt ?? metadata.fallbackCapturedAt);
       const now = new Date().toISOString();
       const record: GalleryMediaRecord = {
         id,
@@ -229,7 +226,7 @@ galleryRouter.post("/upload", upload.any(), async (req, res, next) => {
       created.push(await addGalleryMedia(record));
     }
 
-    res.status(201).json({ media: created.length === 1 ? viewForUser(created[0], user) : created.map((item) => viewForUser(item, user)) });
+    res.status(201).json({ media: created.length === 1 ? mediaView(created[0]) : created.map(mediaView) });
   } catch (error) {
     next(error);
   }
@@ -251,7 +248,7 @@ galleryRouter.post("/media/:id/share", async (req, res, next) => {
     }
 
     const updated = await updateGalleryVisibility(media.id, "shared");
-    res.json({ media: updated ? viewForUser(updated, user) : null });
+    res.json({ media: updated ? mediaView(updated) : null });
   } catch (error) {
     next(error);
   }
@@ -268,7 +265,7 @@ galleryRouter.post("/media/:id/private", async (req, res, next) => {
     }
 
     const updated = await updateGalleryVisibility(media.id, "private");
-    res.json({ media: updated ? viewForUser(updated, user) : null });
+    res.json({ media: updated ? mediaView(updated) : null });
   } catch (error) {
     next(error);
   }

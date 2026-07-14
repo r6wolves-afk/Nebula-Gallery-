@@ -62,6 +62,14 @@ try {
   const privateMedia = privateUpload.media;
   createdIds.push({ id: privateMedia.id, user: users.jace });
 
+  assert(privateMedia.kind === "image", "Uploaded image media does not use the core media kind contract");
+  assert(typeof privateMedia.capturedAt === "string" && privateMedia.capturedAt.length > 0, "Media capturedAt should be required");
+  assert(Number.isInteger(privateMedia.year) && Number.isInteger(privateMedia.month), "Media year and month should be numeric");
+  assert(privateMedia.contentUrl === `/api/gallery/media/${privateMedia.id}/content`, "Media content URL does not point at the content endpoint");
+  assert(typeof privateMedia.thumbnailUrl === "string", "Media thumbnailUrl should be tolerated when present");
+  assert(!("sourceFilePath" in privateMedia), "Media JSON exposes server storage paths");
+  assert(!("fileSize" in privateMedia), "Media JSON exposes the mock storage field instead of size");
+
   const ownerPrivate = await request("/api/gallery/media?scope=private", users.jace);
   const otherPrivate = await request("/api/gallery/media?scope=private", users.mira);
   const otherPrivateByIdStatus = await status(`/api/gallery/media/${privateMedia.id}`, users.mira);
@@ -89,20 +97,19 @@ try {
   const miraShared = await request("/api/gallery/media?scope=shared", users.mira);
   const ownerSharedMedia = jaceShared.media.find((media) => media.id === privateMedia.id);
   const adminSharedForJace = jaceShared.media.find((media) => media.id === sharedMedia.id);
+  const adminSharedDeleteByJaceStatus = await status(`/api/gallery/media/${sharedMedia.id}`, users.jace, { method: "DELETE" });
 
   assert(jaceShared.media.some((media) => media.id === privateMedia.id), "Owner-shared media is not visible in shared gallery");
   assert(miraShared.media.some((media) => media.id === privateMedia.id), "Owner-shared media is not visible to another user");
   assert(jaceShared.media.some((media) => media.id === sharedMedia.id), "User cannot see shared media");
   assert(miraShared.media.some((media) => media.id === sharedMedia.id), "Second user cannot see shared media");
-  assert(ownerSharedMedia?.canDelete === true, "Owner-shared media is not manageable in shared gallery");
-  assert(adminSharedForJace?.canDelete === false, "Regular user can manage another user's shared media");
+  assert(ownerSharedMedia?.visibility === "shared", "Owner-shared media does not report shared visibility");
+  assert(adminSharedDeleteByJaceStatus === 403, "Regular user can manage another user's shared media");
   assert(sharedMedia.ownerDisplayName === "Admin", "Shared media does not expose who owns it");
 
   const timeline = await request("/api/gallery/timeline?scope=all", users.jace);
-  const unsorted = await request("/api/gallery/media?scope=all&unsorted=true", users.jace);
 
-  assert(privateMedia.capturedAt === null && privateMedia.year === null && privateMedia.month === null, "No-EXIF media should be unsorted");
-  assert(unsorted.media.some((media) => media.id === privateMedia.id), "Unsorted filter does not include no-EXIF media");
+  assert(timeline.timeline.some((year) => year.year === privateMedia.year), "Timeline does not include uploaded media year");
 
   console.log(
     JSON.stringify(
@@ -110,7 +117,7 @@ try {
         privateAccess: "passed",
         sharedAccess: "passed",
         regularSharedUpload: regularSharedStatus,
-        capturedAt: privateMedia.capturedAt,
+        mediaKind: privateMedia.kind,
         timelineYears: timeline.timeline.map((year) => `${year.year}:${year.count}`)
       },
       null,

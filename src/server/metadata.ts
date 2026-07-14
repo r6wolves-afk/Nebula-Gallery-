@@ -114,11 +114,7 @@ export async function extractMediaMetadata(filePath: string, mimeType: string): 
   return { width: null, height: null, duration: null, capturedAt: null, fallbackCapturedAt: capturedAt.toISOString() };
 }
 
-export function capturedParts(capturedAt: string | null): { year: number | null; month: number | null } {
-  if (!capturedAt) {
-    return { year: null, month: null };
-  }
-
+export function capturedParts(capturedAt: string): { year: number; month: number } {
   const date = new Date(capturedAt);
 
   return {

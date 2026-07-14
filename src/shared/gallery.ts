@@ -1,6 +1,8 @@
 export type GalleryVisibility = "private" | "shared";
 
-export type GalleryMediaKind = "photo" | "video";
+export type GalleryScope = GalleryVisibility | "all";
+
+export type GalleryMediaKind = "image" | "video";
 
 export type NebulaUserRole = "user" | "admin";
 
@@ -33,25 +35,23 @@ export interface GalleryMediaRecord {
 
 export interface GalleryMediaView {
   id: string;
-  ownerUserId: string;
-  ownerDisplayName: string;
-  kind: GalleryMediaKind;
-  visibility: GalleryVisibility;
   filename: string;
   mimeType: string;
+  kind: GalleryMediaKind;
+  visibility: GalleryVisibility;
+  ownerUserId: string;
+  ownerDisplayName: string;
   size: number;
+  capturedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  year: number;
+  month: number;
+  contentUrl: string;
   width?: number | null;
   height?: number | null;
   durationSeconds?: number | null;
-  capturedAt: string | null;
-  year: number | null;
-  month: number | null;
-  contentUrl: string;
   thumbnailUrl?: string;
-  createdAt: string;
-  updatedAt: string;
-  canShare?: boolean;
-  canDelete?: boolean;
 }
 
 export interface GalleryTimelineMonth {
@@ -66,13 +66,13 @@ export interface GalleryTimelineYear {
 }
 
 export interface GalleryTimeline {
-  scope: GalleryVisibility | "all";
+  scope: GalleryScope;
   years: GalleryTimelineYear[];
   unsortedCount: number;
 }
 
 export interface GalleryMediaQuery {
-  scope?: GalleryVisibility | "all";
+  scope?: GalleryScope;
   year?: number;
   month?: number;
   unsorted?: boolean;
