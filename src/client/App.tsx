@@ -2,6 +2,7 @@ import { ChangeEvent, useEffect, useState } from "react";
 import {
   CalendarDays,
   CheckSquare,
+  Download,
   Film,
   Grid3X3,
   ImageIcon,
@@ -190,6 +191,9 @@ function Lightbox({ media, onClose, onContentError }: { media: GalleryMediaView;
 
   return (
     <div className="lightbox" role="dialog" aria-modal="true">
+      <a className="icon-button download-button" href={media.contentUrl} download={media.filename} aria-label={`Download ${media.filename}`} title="Download media">
+        <Download size={20} />
+      </a>
       <button className="icon-button close-button" onClick={onClose} type="button" aria-label="Close preview">
         <X size={20} />
       </button>
@@ -571,6 +575,7 @@ export function App() {
 
       {activeMedia ? (
         <div className="action-dock">
+          <a href={activeMedia.contentUrl} download={activeMedia.filename}><Download size={16} /> Download</a>
           {canShareMedia(activeMedia) ? (
             <button onClick={() => mutateMedia(activeMedia.id, "share")} type="button"><Share2 size={16} /> Move to shared</button>
           ) : null}

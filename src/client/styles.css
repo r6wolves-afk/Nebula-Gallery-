@@ -142,6 +142,7 @@ select {
 
 .segmented button,
 .upload-button,
+.action-dock a,
 .action-dock button {
   align-items: center;
   border: 0;
@@ -373,7 +374,14 @@ select {
   display: grid;
   height: 40px;
   place-items: center;
+  text-decoration: none;
   width: 40px;
+}
+
+.download-button {
+  position: absolute;
+  right: 72px;
+  top: 24px;
 }
 
 .close-button {
@@ -443,9 +451,11 @@ select {
   z-index: 11;
 }
 
+.action-dock a,
 .action-dock button {
   background: #e0efe9;
   color: var(--accent-strong);
+  text-decoration: none;
 }
 
 .action-dock .danger {

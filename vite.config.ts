@@ -10,7 +10,14 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      "/api": "http://127.0.0.1:8787"
+      "/api": {
+        target: "http://127.0.0.1:8787",
+        headers: {
+          "x-nebula-user-id": "jace",
+          "x-nebula-user-name": "Jace",
+          "x-nebula-user-role": "admin"
+        }
+      }
     }
   }
 });
