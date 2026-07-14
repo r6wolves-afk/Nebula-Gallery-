@@ -218,6 +218,29 @@ select {
   color: var(--muted);
 }
 
+.timeline-select-label,
+.timeline-month-filter {
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-select-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  margin-top: 10px;
+}
+
+.timeline-select-label select {
+  width: 100%;
+}
+
+.timeline-month-filter {
+  border-top: 1px solid var(--line);
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
 .timeline-all {
   gap: 8px;
   justify-content: flex-start !important;
@@ -232,6 +255,10 @@ select {
 .timeline-year .month {
   color: var(--muted);
   padding-left: 22px;
+}
+
+.timeline-month-filter .month {
+  color: var(--muted);
 }
 
 .media-section {
@@ -965,6 +992,33 @@ select {
 .addon-timeline button.active {
   background: rgba(149, 64, 222, 0.42);
   border-color: rgba(220, 145, 255, 0.74);
+}
+
+.addon-timeline .timeline-select-label {
+  color: #d8b4fe;
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.addon-timeline .timeline-select-label select {
+  background: rgba(255, 255, 255, 0.055);
+  border-color: rgba(201, 136, 255, 0.28);
+  color: #fff7ff;
+  min-height: 42px;
+}
+
+.addon-timeline .timeline-select-label option {
+  background: #1c0a35;
+  color: #fff7ff;
+}
+
+.addon-timeline .timeline-month-filter {
+  border-color: rgba(201, 136, 255, 0.2);
+}
+
+.addon-timeline .timeline-month-filter .month {
+  color: #dfd2ef;
 }
 
 .addon-user {

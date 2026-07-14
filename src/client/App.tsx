@@ -278,6 +278,16 @@ export function App() {
     setSelectedMediaIds(new Set());
   }
 
+  function chooseTimelineYear(nextYear: string) {
+    setSelectedYear(nextYear ? Number(nextYear) : null);
+    setSelectedMonth(null);
+  }
+
+  function clearTimelineFilter() {
+    setSelectedYear(null);
+    setSelectedMonth(null);
+  }
+
   function showContentLoadError() {
     setError("Unable to load media content.");
   }
@@ -393,6 +403,7 @@ export function App() {
   });
   const filteredSelectableCount = filteredMedia.filter(canSelectMedia).length;
   const mediaCountLabel = `${filteredMedia.length} ${mediaKindFilter === "photos" ? "photo" : mediaKindFilter === "videos" ? "video" : "item"}${filteredMedia.length === 1 ? "" : "s"}`;
+  const selectedTimelineYear = timeline.find((year) => year.year === selectedYear) ?? null;
 
   return (
     <div className="shell addon-shell">
@@ -434,32 +445,43 @@ export function App() {
         <div className="timeline-browser addon-timeline">
           <button
             className={!selectedYear ? "timeline-all active" : "timeline-all"}
-            onClick={() => { setSelectedYear(null); setSelectedMonth(null); }}
+            onClick={clearTimelineFilter}
             type="button"
           >
             <CalendarDays size={18} /> All media
           </button>
-          {timeline.map((year) => (
-            <div className="timeline-year" key={year.year}>
+          <label className="timeline-select-label" htmlFor="timeline-year">
+            <span>Year</span>
+            <select id="timeline-year" onChange={(event) => chooseTimelineYear(event.target.value)} value={selectedYear ?? ""}>
+              <option value="">Choose year</option>
+              {timeline.map((year) => (
+                <option key={year.year} value={year.year}>
+                  {year.year} ({year.count})
+                </option>
+              ))}
+            </select>
+          </label>
+          {selectedTimelineYear ? (
+            <div className="timeline-month-filter" aria-label="Month filter">
               <button
-                className={selectedYear === year.year && !selectedMonth ? "active" : ""}
-                onClick={() => { setSelectedYear(year.year); setSelectedMonth(null); }}
+                className={!selectedMonth ? "month active" : "month"}
+                onClick={() => setSelectedMonth(null)}
                 type="button"
               >
-                <span>{year.year}</span><small>{year.count}</small>
+                <span>All months</span><small>{selectedTimelineYear.count}</small>
               </button>
-              {year.months.map((month) => (
+              {selectedTimelineYear.months.map((month) => (
                 <button
-                  className={selectedYear === year.year && selectedMonth === month.month ? "month active" : "month"}
+                  className={selectedMonth === month.month ? "month active" : "month"}
                   key={month.month}
-                  onClick={() => { setSelectedYear(year.year); setSelectedMonth(month.month); }}
+                  onClick={() => setSelectedMonth(month.month)}
                   type="button"
                 >
                   <span>{monthNames[month.month - 1]}</span><small>{month.count}</small>
                 </button>
               ))}
             </div>
-          ))}
+          ) : null}
         </div>
       </aside>
 
