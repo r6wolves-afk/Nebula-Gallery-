@@ -124,6 +124,12 @@ function MediaThumb({
   const mediaKind = mediaKindLabel(media);
   const timelineLabel = `${monthNames[media.month - 1]} ${media.year}`;
   const canSelect = canSelectMedia(media);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
+  const thumbnailSrc = thumbnailFailed ? media.contentUrl : media.thumbnailUrl ?? media.contentUrl;
+
+  useEffect(() => {
+    setThumbnailFailed(false);
+  }, [media.id, media.thumbnailUrl]);
 
   function handleTileClick() {
     if (selectionMode && canSelect) {
@@ -132,6 +138,15 @@ function MediaThumb({
     }
 
     onOpen();
+  }
+
+  function handleThumbnailError() {
+    if (!thumbnailFailed && media.thumbnailUrl) {
+      setThumbnailFailed(true);
+      return;
+    }
+
+    onContentError();
   }
 
   return (
@@ -148,8 +163,8 @@ function MediaThumb({
       ) : null}
       <button className="media-open" onClick={handleTileClick} type="button">
         <div className="media-frame">
-          {!isVideo ? <img src={media.contentUrl} alt={media.filename} onError={onContentError} /> : null}
-          {isVideo ? <video src={media.contentUrl} muted playsInline preload="metadata" onError={onContentError} /> : null}
+          {!isVideo ? <img src={thumbnailSrc} alt={media.filename} onError={handleThumbnailError} /> : null}
+          {isVideo ? <video src={media.contentUrl} poster={media.thumbnailUrl} muted playsInline preload="metadata" onError={onContentError} /> : null}
         </div>
         <div className="media-caption">
           <span>{media.filename}</span>
